@@ -1,0 +1,26 @@
+---
+- name: Ansible CI/CD Pipeline
+  hosts: ci_cd_servers
+  become: true
+
+  tasks:
+    - name: Update package manager cache
+      yum:
+        update_cache: yes
+      when: ansible_pkg_mgr == 'yum'
+
+    - name: Install Python
+      package:
+        name: python
+        state: present
+      when: ansible_pkg_mgr == 'dnf'
+
+    - name: Install Ansible
+      package:
+        name:
+          - ansible
+        state: present
+
+  roles:
+    - jenkins
+    - git

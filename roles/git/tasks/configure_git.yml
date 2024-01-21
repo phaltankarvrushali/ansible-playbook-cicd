@@ -1,0 +1,12 @@
+---
+- name: Configure Git
+  # git_config:
+  #   name: "{{ item.name }}"
+  #   value: "{{ item.value }}"
+  #   scope: global
+  # loop:
+  #   - { name: "{{ user_name }}", value: "{{ user_email }}" }
+  git_config:
+    name: "{{ user_name }}"
+    value: "{{ user_email }}"
+    scope: global

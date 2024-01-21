@@ -1,0 +1,93 @@
+---
+
+- name: Set Jenkins Home
+  set_fact:
+    jenkins_home: /var/lib/jenkins
+    # jenkins_home: "{{ jenkins_home }}"
+
+- name: Add Jenkins GPG key
+  shell: "curl -fsSL https://pkg.jenkins.io/debian/jenkins.io.key | gpg --dearmor -o /usr/share/keyrings/jenkins-keyring.gpg"
+  args:
+    creates: /usr/share/keyrings/jenkins-keyring.gpg
+
+- name: Import Jenkins GPG key
+  shell: "gpg --no-default-keyring --keyring /usr/share/keyrings/jenkins-keyring.gpg --import"
+  args:
+    creates: /usr/share/keyrings/jenkins-keyring.gpg
+
+- name: Manually add Jenkins repository configuration
+  lineinfile:
+    path: /etc/yum.repos.d/jenkins.repo
+    line: "baseurl=https://pkg.jenkins.io/redhat-stable"
+    state: present
+
+- name: Update package manager cache
+  yum:
+    name: "*"
+    state: latest
+
+- name: Install Java 11
+  yum:
+    name: java-11-amazon-corretto
+    state: present
+
+- name: Download Jenkins war file
+  get_url:
+    url: https://updates.jenkins.io/latest/jenkins.war
+    dest: /usr/share/java/jenkins.war
+
+- name: Create Jenkins systemd service file
+  copy:
+    content: |
+      [Unit]
+      Description=Jenkins Continuous Integration Server
+      After=network.target
+
+      [Service]
+      ExecStart=/usr/bin/java -jar /usr/share/java/jenkins.war --httpPort=8080
+      User=jenkins
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/jenkins.service
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Restart EC2 instance
+  command: "sudo systemctl restart jenkins"
+
+- name: Start Jenkins service
+  service:
+    name: jenkins
+    state: started
+
+- name: Wait for Jenkins to start
+  wait_for:
+    port: 8080
+
+- name: Install Jenkins Plugins
+  jenkins_script:
+    url: "{{ jenkins_url }}"
+    user: "{{ jenkins_admin_user }}"
+    password: "{{ jenkins_admin_password }}"
+    script: |
+      Jenkins.instance.getPluginManager().installPlugin("git")
+      Jenkins.instance.getPluginManager().installPlugin("github")
+  register: result
+  until: result.rc == 0
+  retries: 5
+  delay: 10
+
+- name: Restart Jenkins
+  service:
+    name: jenkins
+    state: restarted
+    
+- name: Install Git
+  yum:
+    name: git
+    state: present
+
